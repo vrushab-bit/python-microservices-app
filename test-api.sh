@@ -7,8 +7,10 @@ RED='\033[0;31m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-API_BASE="http://localhost:8000/api"
-GATEWAY_BASE="http://localhost:8000"
+
+API_BASE="https://tosapp.non-prod.oneassure.in/api"
+GATEWAY_BASE="https://tosapp.non-prod.oneassure.in"
+
 
 echo -e "${BLUE}========================================${NC}"
 echo -e "${BLUE}Microservices API Test Script${NC}"

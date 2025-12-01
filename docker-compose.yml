@@ -19,37 +19,45 @@ services:
 
   # User Service
   user-service:
-    build: ./services/user-service
+    build:
+      context: .
+      dockerfile: ./services/user-service/Dockerfile
     environment:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_HOST: postgres-db
       DB_NAME: user_db
+      GRPC_PORT: 50051
     depends_on:
       postgres-db:
         condition: service_healthy
     networks:
       - microservices-network
-    command: sh -c "python init_db.py && python app.py"
+    command: sh -c "python init_db.py && ./start.sh"
 
   # Product Service
   product-service:
-    build: ./services/product-service
+    build:
+      context: .
+      dockerfile: ./services/product-service/Dockerfile
     environment:
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_HOST: postgres-db
       DB_NAME: product_db
+      GRPC_PORT: 50052
     depends_on:
       postgres-db:
         condition: service_healthy
     networks:
       - microservices-network
-    command: sh -c "python init_db.py && python app.py"
+    command: sh -c "python init_db.py && ./start.sh"
 
   # Order Service
   order-service:
-    build: ./services/order-service
+    build:
+      context: .
+      dockerfile: ./services/order-service/Dockerfile
     environment:
       DB_USER: postgres
       DB_PASSWORD: postgres
@@ -57,6 +65,10 @@ services:
       DB_NAME: order_db
       USER_SERVICE_URL: http://user-service:5001
       PRODUCT_SERVICE_URL: http://product-service:5002
+      USER_GRPC_HOST: user-service
+      USER_GRPC_PORT: 50051
+      PRODUCT_GRPC_HOST: product-service
+      PRODUCT_GRPC_PORT: 50052
     depends_on:
       user-service:
         condition: service_started
@@ -70,11 +82,17 @@ services:
 
   # API Gateway
   gateway-service:
-    build: ./services/gateway-service
+    build:
+      context: .
+      dockerfile: ./services/gateway-service/Dockerfile
     environment:
       USER_SERVICE_URL: http://user-service:5001
       PRODUCT_SERVICE_URL: http://product-service:5002
       ORDER_SERVICE_URL: http://order-service:5003
+      USER_GRPC_HOST: user-service
+      USER_GRPC_PORT: 50051
+      PRODUCT_GRPC_HOST: product-service
+      PRODUCT_GRPC_PORT: 50052
     depends_on:
       - user-service
       - product-service

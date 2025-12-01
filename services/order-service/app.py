@@ -4,6 +4,13 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import os
 import requests
+import sys
+
+# Add proto path
+sys.path.append('/app/proto')
+sys.path.append('/app')
+
+from grpc_client import UserServiceClient, ProductServiceClient
 
 app = Flask(__name__)
 CORS(app)
@@ -19,9 +26,19 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# Service URLs for inter-service communication
+# Service URLs for inter-service communication (HTTP fallback)
 USER_SERVICE_URL = os.getenv('USER_SERVICE_URL', 'http://user-service:5001')
 PRODUCT_SERVICE_URL = os.getenv('PRODUCT_SERVICE_URL', 'http://product-service:5002')
+
+# gRPC clients
+USER_GRPC_HOST = os.getenv('USER_GRPC_HOST', 'user-service')
+USER_GRPC_PORT = os.getenv('USER_GRPC_PORT', '50051')
+PRODUCT_GRPC_HOST = os.getenv('PRODUCT_GRPC_HOST', 'product-service')
+PRODUCT_GRPC_PORT = os.getenv('PRODUCT_GRPC_PORT', '50052')
+
+# Initialize gRPC clients
+user_grpc_client = UserServiceClient(USER_GRPC_HOST, USER_GRPC_PORT)
+product_grpc_client = ProductServiceClient(PRODUCT_GRPC_HOST, PRODUCT_GRPC_PORT)
 
 
 class Order(db.Model):
@@ -45,8 +62,17 @@ class Order(db.Model):
         }
 
 
-def validate_user(user_id):
-    """Validate that user exists by calling User Service"""
+def validate_user(user_id, use_grpc=True):
+    """Validate that user exists by calling User Service (via gRPC or HTTP)"""
+    if use_grpc:
+        try:
+            user = user_grpc_client.get_user(user_id)
+            return user is not None
+        except Exception as e:
+            print(f'gRPC error validating user: {e}, falling back to HTTP')
+            # Fallback to HTTP
+            pass
+    
     try:
         response = requests.get(f'{USER_SERVICE_URL}/users/{user_id}', timeout=5)
         return response.status_code == 200
@@ -55,8 +81,17 @@ def validate_user(user_id):
         return False
 
 
-def validate_product(product_id):
-    """Validate that product exists by calling Product Service"""
+def validate_product(product_id, use_grpc=True):
+    """Validate that product exists by calling Product Service (via gRPC or HTTP)"""
+    if use_grpc:
+        try:
+            product = product_grpc_client.get_product(product_id)
+            return product
+        except Exception as e:
+            print(f'gRPC error validating product: {e}, falling back to HTTP')
+            # Fallback to HTTP
+            pass
+    
     try:
         response = requests.get(f'{PRODUCT_SERVICE_URL}/products/{product_id}', timeout=5)
         if response.status_code == 200:
@@ -113,12 +148,12 @@ def create_order():
         if quantity <= 0:
             return jsonify({'error': 'Quantity must be positive'}), 400
         
-        # Validate user exists
-        if not validate_user(user_id):
+        # Validate user exists (using gRPC)
+        if not validate_user(user_id, use_grpc=True):
             return jsonify({'error': 'User not found'}), 404
         
-        # Validate product exists and get price
-        product = validate_product(product_id)
+        # Validate product exists and get price (using gRPC)
+        product = validate_product(product_id, use_grpc=True)
         if not product:
             return jsonify({'error': 'Product not found'}), 404
         

@@ -2,8 +2,9 @@
 
 # Simple test script without colors (for environments without color support)
 
-API_BASE="http://localhost:8000/api"
-GATEWAY_BASE="http://localhost:8000"
+
+API_BASE="https://tosapp.non-prod.oneassure.in/api"
+GATEWAY_BASE="https://tosapp.non-prod.oneassure.in"
 
 echo "========================================"
 echo "Microservices API Test Script"
