@@ -80,7 +80,7 @@ services:
       - product-service
       - order-service
     ports:
-      - "5000:5000"
+      - "8000:5000"
     networks:
       - microservices-network
 
@@ -90,7 +90,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      VITE_API_URL: http://localhost:5000/api
+      VITE_API_URL: http://localhost:8000/api
     depends_on:
       - gateway-service
     networks:
