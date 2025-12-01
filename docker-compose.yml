@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (single instance with multiple databases)
+  postgres-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - microservices-network
+
+  # User Service
+  user-service:
+    build: ./services/user-service
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: postgres-db
+      DB_NAME: user_db
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    command: sh -c "python init_db.py && python app.py"
+
+  # Product Service
+  product-service:
+    build: ./services/product-service
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: postgres-db
+      DB_NAME: product_db
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    command: sh -c "python init_db.py && python app.py"
+
+  # Order Service
+  order-service:
+    build: ./services/order-service
+    environment:
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_HOST: postgres-db
+      DB_NAME: order_db
+      USER_SERVICE_URL: http://user-service:5001
+      PRODUCT_SERVICE_URL: http://product-service:5002
+    depends_on:
+      user-service:
+        condition: service_started
+      product-service:
+        condition: service_started
+      postgres-db:
+        condition: service_healthy
+    networks:
+      - microservices-network
+    command: sh -c "python init_db.py && python app.py"
+
+  # API Gateway
+  gateway-service:
+    build: ./services/gateway-service
+    environment:
+      USER_SERVICE_URL: http://user-service:5001
+      PRODUCT_SERVICE_URL: http://product-service:5002
+      ORDER_SERVICE_URL: http://order-service:5003
+    depends_on:
+      - user-service
+      - product-service
+      - order-service
+    ports:
+      - "5000:5000"
+    networks:
+      - microservices-network
+
+  # Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:5000/api
+    depends_on:
+      - gateway-service
+    networks:
+      - microservices-network
+
+networks:
+  microservices-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+
